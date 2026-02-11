@@ -153,7 +153,8 @@ class GPTDatasetV1(Dataset):
 
 if __name__ == "__main__":
     print("fffffffffffffffffffffffff")
-    txt = "Hello Guys, I hope you all are doing well! Fuck Ali Khamanei and Islamic Republic regime. Fuck all the mollahs. fuck their Mom and wife and sister and daughters."
+    txt = "We will make the Iran great again! we will make our country the heaven on earth! we will make our people happy and prosperous! we will make our economy strong and stable! we will make our culture rich and vibrant! we will make our future bright and hopeful! we will make our dreams come true! we will make our vision a reality! we will make our mission successful! we will make our goals achievable! we will make our plans effective! we will make our actions impactful! we will make our efforts fruitful! we will make our work meaningful! we will make our lives fulfilling! we will make our legacy enduring!")
+    print(f"fffffffffffffffffffffffff")
     # Simple test text
     # txt = "Hello world! This is a test sentence for the GPT dataset."
     print(f"*******************text: {txt}")

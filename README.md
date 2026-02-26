@@ -1,7 +1,7 @@
 # 🤖 miniGPT — Building a GPT from Scratch
 
 <p align="center">
-  <img src="lio_and_sun_gpt.png" alt="Iran" />
+  <img src="Scientific lion and robot lab setup_2.png" alt="Iran" />
 </p>
 
 

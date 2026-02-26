@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Causal & Multi-Head Attention</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #09090f;
+            --surface: #111118;
+            --surface2: #17171f;
+            --border: #2a2a3a;
+            --accent: #7c6cfc;
+            --accent2: #fc6cb4;
+            --accent3: #6cfccc;
+            --text: #e8e8f0;
+            --muted: #7070a0;
+            --code-bg: #0d0d16;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 300;
+            line-height: 1.75;
+            overflow-x: hidden;
+        }
+
+        /* Noise texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.6;
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 6rem 8vw;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            width: 700px;
+            height: 700px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(124, 108, 252, 0.12) 0%, transparent 70%);
+            top: -200px;
+            right: -200px;
+            pointer-events: none;
+        }
+
+        .hero-badge {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid rgba(124, 108, 252, 0.3);
+            padding: 0.35em 0.9em;
+            border-radius: 2px;
+            margin-bottom: 2rem;
+            display: inline-block;
+            animation: fadeUp 0.8s ease both;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.5rem;
+            animation: fadeUp 0.8s ease 0.1s both;
+        }
+
+        h1 span.glow {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-sub {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 560px;
+            margin-bottom: 3rem;
+            animation: fadeUp 0.8s ease 0.2s both;
+        }
+
+        .hero-pills {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            animation: fadeUp 0.8s ease 0.3s both;
+        }
+
+        .pill {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.72rem;
+            padding: 0.4em 1em;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            letter-spacing: 0.05em;
+        }
+
+        /* Scroll line */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2.5rem;
+            left: 8vw;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            animation: fadeUp 1s ease 0.6s both;
+        }
+
+        .scroll-line {
+            width: 40px;
+            height: 1px;
+            background: var(--muted);
+            transform-origin: left;
+            animation: grow 1.5s ease 1.5s both;
+        }
+
+        /* Sections */
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 0 8vw 8rem;
+        }
+
+        .section {
+            margin-bottom: 5rem;
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, var(--border), transparent);
+            max-width: 200px;
+        }
+
+        h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(1.6rem, 3vw, 2.2rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 1.25rem;
+            line-height: 1.2;
+        }
+
+        h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin-bottom: 0.75rem;
+            color: var(--text);
+        }
+
+        p {
+            color: #b0b0c8;
+            margin-bottom: 1rem;
+            font-size: 0.97rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.82rem;
+            line-height: 1.7;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+        pre .comment {
+            color: var(--muted);
+        }
+
+        pre .kw {
+            color: var(--accent2);
+        }
+
+        pre .fn {
+            color: var(--accent3);
+        }
+
+        pre .str {
+            color: #fcd66c;
+        }
+
+        pre .dim {
+            color: var(--muted);
+        }
+
+        pre .hl {
+            color: var(--accent);
+        }
+
+        pre .shape {
+            color: var(--accent3);
+        }
+
+        code {
+            font-family: 'DM Mono', monospace;
+            background: var(--surface2);
+            color: var(--accent2);
+            padding: 0.15em 0.45em;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+
+        /* Concept cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+        }
+
+        .card {
+            background: var(--surface);
+            padding: 1.5rem;
+            transition: background 0.2s ease;
+        }
+
+        .card:hover {
+            background: var(--surface2);
+        }
+
+        .card-icon {
+            font-size: 1.4rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .card h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .card p {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin: 0;
+        }
+
+        /* Shape flow */
+        .shape-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .shape-row {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0.9rem 1.5rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+        }
+
+        .shape-row:last-child {
+            border-bottom: none;
+        }
+
+        .shape-row:hover {
+            background: var(--surface2);
+        }
+
+        .shape-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            min-width: 90px;
+        }
+
+        .shape-arrow {
+            color: var(--accent);
+            font-size: 0.7rem;
+            opacity: 0.5;
+        }
+
+        .shape-val {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.82rem;
+            color: var(--accent3);
+        }
+
+        .shape-note {
+            margin-left: auto;
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+
+        /* Transpose table */
+        .table-wrap {
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--muted);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid rgba(42, 42, 58, 0.5);
+            color: #b0b0c8;
+            vertical-align: top;
+        }
+
+        td:first-child {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent2);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: var(--surface);
+        }
+
+        /* Misconception list */
+        .misconception {
+            display: grid;
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+        }
+
+        .mc-item {
+            background: var(--surface);
+            padding: 1.2rem 1.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .mc-item:hover {
+            background: var(--surface2);
+        }
+
+        .mc-x {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.75rem;
+            color: #fc6c6c;
+            background: rgba(252, 108, 108, 0.08);
+            border: 1px solid rgba(252, 108, 108, 0.2);
+            padding: 0.2em 0.5em;
+            border-radius: 3px;
+            flex-shrink: 0;
+            margin-top: 0.1em;
+        }
+
+        .mc-text strong {
+            display: block;
+            font-size: 0.88rem;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+
+        .mc-text span {
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        /* Divider */
+        hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 4rem 0;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 8vw;
+            border-top: 1px solid var(--border);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+        }
+
+        footer strong {
+            color: var(--accent);
+        }
+
+        /* Animations */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes grow {
+            from {
+                transform: scaleX(0);
+            }
+
+            to {
+                transform: scaleX(1);
+            }
+        }
+
+        /* Mask visual */
+        .mask-visual {
+            display: inline-grid;
+            grid-template-columns: repeat(4, 36px);
+            grid-template-rows: repeat(4, 36px);
+            gap: 3px;
+            margin: 1.5rem 0;
+        }
+
+        .cell {
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+
+        .cell:hover {
+            transform: scale(1.1);
+        }
+
+        .cell.allowed {
+            background: rgba(108, 252, 204, 0.1);
+            border: 1px solid rgba(108, 252, 204, 0.25);
+            color: var(--accent3);
+        }
+
+        .cell.forbidden {
+            background: rgba(252, 108, 108, 0.08);
+            border: 1px solid rgba(252, 108, 108, 0.15);
+            color: rgba(252, 108, 108, 0.6);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ─── HERO ─────────────────────────────────────────────────── -->
+    <section class="hero">
+        <span class="hero-badge">📄 README · Deep Learning</span>
+        <h1>Causal &amp;<br /><span class="glow">Multi-Head</span><br />Attention</h1>
+        <p class="hero-sub">A clear, practical guide covering every transpose, every reshape, and every architectural
+            decision — with the confusions finally explained.</p>
+        <div class="hero-pills">
+            <span class="pill">PyTorch</span>
+            <span class="pill">Transformers</span>
+            <span class="pill">Shape Tracking</span>
+            <span class="pill">Self-Attention</span>
+            <span class="pill">Causal Masking</span>
+        </div>
+        <div class="scroll-indicator">
+            <span class="scroll-line"></span>
+            scroll to read
+        </div>
+    </section>
+
+    <!-- ─── MAIN ──────────────────────────────────────────────────── -->
+    <div class="container">
+
+        <!-- Big Picture -->
+        <div class="section">
+            <div class="section-label">01 · Overview</div>
+            <h2>Two Ideas. One Module.</h2>
+            <p>In Transformer models, attention allows each token to look at other tokens and decide which ones are
+                important. Two mechanisms power this:</p>
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-icon">⏮</div>
+                    <h3>Causal Attention</h3>
+                    <p>Prevents any token from looking into the future. Enforces the direction of time during
+                        autoregressive generation.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔀</div>
+                    <h3>Multi-Head Attention</h3>
+                    <p>Splits the representation into subspaces so the model can learn multiple similarity metrics in
+                        parallel.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="section">
+            <div class="section-label">02 · Input</div>
+            <h2>From Embedding to Keys, Queries, Values</h2>
+            <p>Everything starts from an input tensor <code>x</code>:</p>
+            <pre><span class="comment"># x : (batch, num_tokens, d_in)</span>
+
+keys    = <span class="fn">self.W_key</span>(x)    <span class="comment"># → (b, num_tokens, d_out)</span>
+queries = <span class="fn">self.W_query</span>(x)  <span class="comment"># → (b, num_tokens, d_out)</span>
+values  = <span class="fn">self.W_value</span>(x)  <span class="comment"># → (b, num_tokens, d_out)</span>
+
+<span class="comment"># d_out = num_heads × head_dim</span></pre>
+            <p>Three linear projections, each producing <code>d_out = num_heads × head_dim</code> features.</p>
+        </div>
+
+        <!-- Multi-head split -->
+        <div class="section">
+            <div class="section-label">03 · Splitting Heads</div>
+            <h2>Reshape, Then Transpose</h2>
+            <p>We want each head to operate independently. This takes two steps:</p>
+            <pre><span class="comment"># Step 1 — view: reinterpret memory layout</span>
+keys = keys.<span class="fn">view</span>(b, num_tokens, num_heads, head_dim)
+<span class="dim"># (b, num_tokens, num_heads, head_dim)</span>
+
+<span class="comment"># Step 2 — transpose(1,2): move head dim forward</span>
+keys = keys.<span class="fn">transpose</span>(<span class="hl">1, 2</span>)
+<span class="dim"># (b, num_heads, num_tokens, head_dim)
+#     ↑ now: Batch → Head → Token → Feature</span></pre>
+            <p>After <code>transpose(1, 2)</code>, each head has its own slice of the batch dimension. Attention
+                computation per head becomes clean and parallelisable.</p>
+        </div>
+
+        <!-- Attention scores -->
+        <div class="section">
+            <div class="section-label">04 · Attention Scores</div>
+            <h2>Why <code>keys.transpose(2, 3)</code>?</h2>
+            <p>Matrix multiplication demands inner dimensions to match: <code>(..., m, k) @ (..., k, n)</code>. After
+                splitting heads we have:</p>
+            <pre>queries: <span class="shape">(b, num_heads, num_tokens, head_dim)</span>
+keys:    <span class="shape">(b, num_heads, num_tokens, head_dim)</span>
+<span class="comment">
+# ❌  (num_tokens, head_dim) @ (num_tokens, head_dim) — invalid
+# ✅  (num_tokens, head_dim) @ (head_dim, num_tokens) — valid
+</span>
+attn_scores = queries @ keys.<span class="fn">transpose</span>(<span class="hl">2, 3</span>)
+<span class="dim"># keys after transpose: (b, num_heads, head_dim, num_tokens)
+# result:               (b, num_heads, num_tokens, num_tokens)</span></pre>
+            <p><code>transpose(2, 3)</code> is purely a linear algebra requirement — nothing more, nothing less.</p>
+        </div>
+
+        <!-- Causal mask -->
+        <div class="section">
+            <div class="section-label">05 · Causal Masking</div>
+            <h2>Blocking the Future</h2>
+            <p>When predicting token <em>i</em>, the model must not see tokens at positions <em>&gt; i</em>. We enforce
+                this with an upper-triangular mask:</p>
+            <pre><span class="fn">self.register_buffer</span>(
+    <span class="str">"mask"</span>,
+    torch.<span class="fn">triu</span>(torch.<span class="fn">ones</span>(context_length, context_length), diagonal=<span class="hl">1</span>)
+    <span class="comment"># 1 = forbidden   0 = allowed</span>
+)
+
+<span class="comment"># Apply: replace forbidden positions with -∞</span>
+attn_scores.<span class="fn">masked_fill_</span>(mask_bool, -torch.inf)
+
+<span class="comment"># After softmax: softmax(-∞) = 0 → future tokens get weight 0</span></pre>
+
+            <p>Here's what the mask looks like for a 4-token sequence:</p>
+            <div class="mask-visual">
+                <!-- Row 0 -->
+                <div class="cell allowed">0</div>
+                <div class="cell forbidden">1</div>
+                <div class="cell forbidden">1</div>
+                <div class="cell forbidden">1</div>
+                <!-- Row 1 -->
+                <div class="cell allowed">0</div>
+                <div class="cell allowed">0</div>
+                <div class="cell forbidden">1</div>
+                <div class="cell forbidden">1</div>
+                <!-- Row 2 -->
+                <div class="cell allowed">0</div>
+                <div class="cell allowed">0</div>
+                <div class="cell allowed">0</div>
+                <div class="cell forbidden">1</div>
+                <!-- Row 3 -->
+                <div class="cell allowed">0</div>
+                <div class="cell allowed">0</div>
+                <div class="cell allowed">0</div>
+                <div class="cell allowed">0</div>
+            </div>
+            <p style="font-size:0.8rem;color:var(--muted);">Green = attend · Red = masked to −∞ · Rows = current token ·
+                Columns = token attended to</p>
+        </div>
+
+        <!-- register_buffer -->
+        <div class="section">
+            <div class="section-label">06 · register_buffer</div>
+            <h2>Why Not Just <code>self.mask = …</code>?</h2>
+            <p>If you assign the mask as a plain attribute, calling <code>model.to("cuda")</code> moves parameters to
+                the GPU — but your mask stays on CPU, causing a device mismatch error. <code>register_buffer</code>
+                solves all three problems at once:</p>
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-icon">🚀</div>
+                    <h3>Moves with model</h3>
+                    <p>Automatically transferred when you call <code>.to(device)</code> or <code>.cuda()</code>.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">💾</div>
+                    <h3>Saved in state_dict</h3>
+                    <p>Persists when you checkpoint and reload the model.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔒</div>
+                    <h3>Not learnable</h3>
+                    <p>No gradient, no optimizer update. It's a fixed architectural rule.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Context vector -->
+        <div class="section">
+            <div class="section-label">07 · Context Vector</div>
+            <h2>Merge the Heads Back</h2>
+            <p>After weighted aggregation over values, we need to reassemble the multi-head output:</p>
+            <pre><span class="comment"># Weighted sum over values</span>
+context_vec = attn_weights @ values
+<span class="dim"># (b, num_heads, num_tokens, head_dim)</span>
+
+<span class="comment"># Put token dim back before head dim</span>
+context_vec = context_vec.<span class="fn">transpose</span>(<span class="hl">1, 2</span>)
+<span class="dim"># (b, num_tokens, num_heads, head_dim)</span>
+
+<span class="comment"># Merge heads: concatenate along last two dims</span>
+context_vec = context_vec.<span class="fn">view</span>(b, num_tokens, d_out)
+<span class="dim"># (b, num_tokens, d_out)   where d_out = num_heads × head_dim</span></pre>
+        </div>
+
+        <!-- Full shape flow -->
+        <div class="section">
+            <div class="section-label">08 · Shape Flow</div>
+            <h2>Every Transform, In Order</h2>
+            <div class="shape-flow">
+                <div class="shape-row">
+                    <span class="shape-label">Input</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_tokens, d_in)</span>
+                    <span class="shape-note">raw embeddings</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">Linear</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_tokens, d_out)</span>
+                    <span class="shape-note">W_q / W_k / W_v</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">view</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_tokens, num_heads, head_dim)</span>
+                    <span class="shape-note">split heads</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">transpose(1,2)</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_heads, num_tokens, head_dim)</span>
+                    <span class="shape-note">head first</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">@ keys.T(2,3)</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_heads, num_tokens, num_tokens)</span>
+                    <span class="shape-note">attention scores</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">softmax</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_heads, num_tokens, num_tokens)</span>
+                    <span class="shape-note">attention weights</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">@ values</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_heads, num_tokens, head_dim)</span>
+                    <span class="shape-note">context per head</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">transpose(1,2)</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_tokens, num_heads, head_dim)</span>
+                    <span class="shape-note">token first again</span>
+                </div>
+                <div class="shape-row">
+                    <span class="shape-label">view</span>
+                    <span class="shape-arrow">→</span>
+                    <span class="shape-val">(b, num_tokens, d_out)</span>
+                    <span class="shape-note">merge heads</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transposes summary -->
+        <div class="section">
+            <div class="section-label">09 · Quick Reference</div>
+            <h2>The Two Transposes</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Operation</th>
+                            <th>Reason</th>
+                            <th>Shape change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>transpose(1, 2)</td>
+                            <td>Rearrange tensor so heads lead, enabling per-head view &amp; final reshape</td>
+                            <td>(b, T, H, D) → (b, H, T, D)</td>
+                        </tr>
+                        <tr>
+                            <td>transpose(2, 3)</td>
+                            <td>Satisfy matrix multiplication inner-dimension rule for QKᵀ</td>
+                            <td>(b, H, T, D) → (b, H, D, T)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>Nothing mystical. One is for tensor layout; the other is for linear algebra.</p>
+        </div>
+
+        <!-- Common misunderstandings -->
+        <div class="section">
+            <div class="section-label">10 · Misconceptions</div>
+            <h2>Common Confusions — Resolved</h2>
+            <div class="misconception">
+                <div class="mc-item">
+                    <span class="mc-x">✗ False</span>
+                    <div class="mc-text">
+                        <strong>"Transpose changes the data."</strong>
+                        <span>No. It only reorders the axes. The underlying memory values are untouched.</span>
+                    </div>
+                </div>
+                <div class="mc-item">
+                    <span class="mc-x">✗ False</span>
+                    <div class="mc-text">
+                        <strong>"view() splits the tensor into separate pieces."</strong>
+                        <span>No. It reinterprets the existing memory layout without any copy or split.</span>
+                    </div>
+                </div>
+                <div class="mc-item">
+                    <span class="mc-x">✗ False</span>
+                    <div class="mc-text">
+                        <strong>"The causal mask is a learnable parameter."</strong>
+                        <span>No. It's a fixed architectural rule registered as a buffer, with no gradient.</span>
+                    </div>
+                </div>
+                <div class="mc-item">
+                    <span class="mc-x">✗ False</span>
+                    <div class="mc-text">
+                        <strong>"Multi-head attention means multiple separate models."</strong>
+                        <span>No. It means splitting a single representation into parallel subspaces within one
+                            module.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Teaching tip -->
+        <div class="section">
+            <div class="section-label">11 · Tip</div>
+            <h2>Debug Shapes Like a Pro</h2>
+            <p>When attention code confuses you, follow this four-step method:</p>
+            <pre><span class="comment"># 1. Write down the current shape</span>
+<span class="fn">print</span>(tensor.shape)
+
+<span class="comment"># 2. Write the matmul rule: (..., m, k) @ (..., k, n)</span>
+<span class="comment"># 3. Find which dimensions need to align</span>
+<span class="comment"># 4. Ask: is this transpose for math compatibility or for reshaping?</span></pre>
+            <p>Master shape tracking → master attention. It really is that simple.</p>
+        </div>
+
+    </div>
+
+    <footer>
+        <strong>Causal &amp; Multi-Head Attention</strong> · A Practical Tutorial · Built with care
+    </footer>
+
+    <script>
+        // Intersection observer for section reveals
+        const sections = document.querySelectorAll('.section');
+        const observer = new IntersectionObserver(
+            (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
+            { threshold: 0.1 }
+        );
+        sections.forEach(s => observer.observe(s));
+    </script>
+</body>
+
+</html>

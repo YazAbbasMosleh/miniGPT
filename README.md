@@ -1,5 +1,10 @@
 # 🤖 miniGPT — Building a GPT from Scratch
 
+<p align="center">
+  <img src="lio_and_sun_gpt.png" alt="Iran" />
+</p>
+
+
 > A ground-up implementation of a GPT-style language model in PyTorch.  
 > Every component — from tokenization to attention — written by hand, no black boxes.
 

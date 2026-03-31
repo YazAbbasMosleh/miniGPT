@@ -1,3 +1,4 @@
+![My Image](mini.png)
 # 🤖 miniGPT — Building a GPT from Scratch
 
 

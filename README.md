@@ -1,8 +1,5 @@
 # 🤖 miniGPT — Building a GPT from Scratch
 
-<p align="center">
-  <img src="Scientific lion and robot lab setup_2.png" alt="Iran" />
-</p>
 
 
 > A ground-up implementation of a GPT-style language model in PyTorch.  

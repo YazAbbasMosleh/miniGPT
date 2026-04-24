@@ -119,12 +119,12 @@ Raw Text
 | **Attention** | Scaled dot-product self-attention | ✅ Done |
 | **Attention** | Causal masking | ✅ Done |
 | **Attention** | Multi-head attention | ✅ Done |
-| **Model** | Token + positional embeddings | 🔧 In Progress |
-| **Model** | Feed-forward layer | 🔧 In Progress |
-| **Model** | Transformer block (Attention + FF + Norm) | 🔧 In Progress |
-| **Model** | Full GPT model (stacked blocks) | 📋 Planned |
-| **Training** | Cross-entropy loss + optimizer | 📋 Planned |
-| **Training** | Training & validation loop | 📋 Planned |
+| **Model** | Token + positional embeddings | ✅ Done |
+| **Model** | Feed-forward layer | ✅ Done |
+| **Model** | Transformer block (Attention + FF + Norm) | ✅ Done |
+| **Model** | Full GPT model (stacked blocks) | ✅ Done |
+| **Training** | Cross-entropy loss + optimizer | ✅ Done |
+| **Training** | Training & validation loop | ✅ Done|
 | **Inference** | Text generation / greedy decoding | 📋 Planned |
 | **Inference** | Temperature sampling / top-k | 📋 Planned |
 
